@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg15
+    container_name: intelliavatar-db
+    environment:
+      POSTGRES_DB: intelliavatar
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - intelliavatar-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: intelliavatar-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - intelliavatar-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: intelliavatar-backend
+    volumes:
+      - ./backend:/app
+      - ./uploads:/app/uploads
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/intelliavatar
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=super-secret-jwt-signing-key-change-in-production
+      - AVATAR_ENGINE=mock
+      - LIPSYNC_ENGINE=mock
+      - LLM_PROVIDER=mock
+      - TTS_PROVIDER=mock
+      - ASR_PROVIDER=mock
+      - DEVICE=cpu
+    depends_on:
+      - db
+      - redis
+    networks:
+      - intelliavatar-net
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: intelliavatar-worker
+    command: python -m celery -A app.core.celery_app worker --loglevel=info
+    volumes:
+      - ./backend:/app
+      - ./uploads:/app/uploads
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/intelliavatar
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=super-secret-jwt-signing-key-change-in-production
+      - AVATAR_ENGINE=mock
+      - LIPSYNC_ENGINE=mock
+      - LLM_PROVIDER=mock
+      - TTS_PROVIDER=mock
+      - ASR_PROVIDER=mock
+      - DEVICE=cpu
+    depends_on:
+      - db
+      - redis
+    networks:
+      - intelliavatar-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: intelliavatar-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - intelliavatar-net
+
+volumes:
+  postgres_data:
+
+networks:
+  intelliavatar-net:
+    driver: bridge
