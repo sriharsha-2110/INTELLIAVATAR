@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import ThreeDAvatarStage from '../components/ThreeDAvatarStage';
 import ThreeCanvasViewer, { CameraPreset } from '../components/ThreeCanvasViewer';
 import ImageCropModal from '../components/ImageCropModal';
 import { analyzeHumanPortrait, DetectedHumanProfile } from '../utils/faceAnalysis';
@@ -25,6 +26,8 @@ export default function AvatarCreator() {
   const [responseStyle, setResponseStyle] = useState('Detailed');
   const [defaultEmotion, setDefaultEmotion] = useState('NEUTRAL');
   const [cameraPreset, setCameraPreset] = useState<CameraPreset>('classroom');
+  const [stageMode, setStageMode] = useState<'hologram' | 'portrait'>('portrait');
+  const [mouthPos, setMouthPos] = useState<{ x: number; y: number } | undefined>(undefined);
   const [isConsentChecked, setIsConsentChecked] = useState(true);
 
   // 3D Canvas Preview states
@@ -238,7 +241,9 @@ export default function AvatarCreator() {
           skin_tone: humanProfile?.skinTone || '#e0b8a3',
           hair_color: humanProfile?.hairColor || '#1a1412',
           clothing_color: humanProfile?.clothingColor || '#1e293b',
-          detected_gender: humanProfile?.gender || 'Female',
+          detected_gender: humanProfile?.gender || genderPresentation || 'Female',
+          stage_mode: stageMode,
+          mouth_pos: mouthPos,
         },
         created_at: new Date().toISOString(),
       };
@@ -359,19 +364,20 @@ export default function AvatarCreator() {
                 </span>
               </div>
 
-              {/* Real Three.js Canvas Viewer with Imaged Person Face & Likeness */}
-              <div className="w-full h-72 rounded-xl overflow-hidden shadow-2xl relative border border-cyan-500/30">
-                <ThreeCanvasViewer
-                  portraitTextureUrl={previewImage}
+              {/* Photorealistic 3D Human Avatar Stage with 3D Parallax & Viseme Lip-Sync */}
+              <div className="w-full h-80 rounded-xl overflow-hidden shadow-2xl relative border border-cyan-500/30">
+                <ThreeDAvatarStage
+                  imageUrl={previewImage}
+                  name={name}
                   isSpeaking={isPlayingVoiceSample}
-                  gesture="explain_one_hand"
-                  cameraPreset={cameraPreset}
-                  gender={humanProfile?.gender || genderPresentation}
-                  skinTone={humanProfile?.skinTone}
-                  hairColor={humanProfile?.hairColor}
-                  clothingColor={humanProfile?.clothingColor}
-                  enableControls={true}
-                  onCameraChange={(p) => setCameraPreset(p)}
+                  isThinking={false}
+                  isRecording={false}
+                  stageMode={stageMode}
+                  onToggleStageMode={() => setStageMode(stageMode === 'hologram' ? 'portrait' : 'hologram')}
+                  selectedLanguage={selectedLanguage}
+                  emotion={defaultEmotion}
+                  mouthPos={mouthPos}
+                  onMouthPosChange={(pos) => setMouthPos(pos)}
                 />
               </div>
 

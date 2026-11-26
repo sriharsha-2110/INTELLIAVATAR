@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import ThreeDAvatarStage from '../components/ThreeDAvatarStage';
 import ThreeCanvasViewer, { CameraPreset, LightingTheme } from '../components/ThreeCanvasViewer';
 import { TeachingGesture } from '../components/ThreeDHumanoidModel';
 import { 
   Cpu, ArrowLeft, Volume2, Sparkles, Sliders, 
   RotateCcw, Save, BookOpen, MessageCircle, Check, 
-  Layers, Smile, Sun, CheckCircle2, AlertCircle
+  Layers, Smile, Sun, CheckCircle2, AlertCircle, Eye, Box
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -15,6 +16,9 @@ export default function AvatarStudio() {
   const navigate = useNavigate();
 
   const [avatar, setAvatar] = useState<any>(null);
+  const [viewerMode, setViewerMode] = useState<'photorealistic' | 'skeletal_mesh'>('photorealistic');
+  const [stageMode, setStageMode] = useState<'hologram' | 'portrait'>('hologram');
+  const [mouthPos, setMouthPos] = useState<{ x: number; y: number } | undefined>(undefined);
   const [activeGesture, setActiveGesture] = useState<TeachingGesture>('idle');
   const [cameraPreset, setCameraPreset] = useState<CameraPreset>('classroom');
   const [lightingTheme, setLightingTheme] = useState<LightingTheme>('warm_studio');
@@ -39,6 +43,12 @@ export default function AvatarStudio() {
         }
         if (localFound.settings_json?.lighting) {
           setLightingTheme(localFound.settings_json.lighting);
+        }
+        if (localFound.settings_json?.stage_mode) {
+          setStageMode(localFound.settings_json.stage_mode);
+        }
+        if (localFound.settings_json?.mouth_pos) {
+          setMouthPos(localFound.settings_json.mouth_pos);
         }
       } else {
         // Fallback default Aurora-7
@@ -115,6 +125,8 @@ export default function AvatarStudio() {
       lighting: lightingTheme,
       wireframe: wireframe,
       language: selectedLanguage,
+      stage_mode: stageMode,
+      mouth_pos: mouthPos,
     };
 
     // Update in LocalStorage
@@ -195,55 +207,112 @@ export default function AvatarStudio() {
           
           {/* Main 3D Canvas Viewport (8 Cols) */}
           <div className="lg:col-span-8 space-y-4">
+            {/* Viewport Model Type Switcher */}
+            <div className="flex items-center justify-between">
+              <div className="flex rounded-xl bg-white/5 border border-white/10 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setViewerMode('photorealistic')}
+                  className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-all ${
+                    viewerMode === 'photorealistic'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shadow-sm'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  <span>3D Digital Human (Viseme Lip-Sync)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewerMode('skeletal_mesh')}
+                  className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-all ${
+                    viewerMode === 'skeletal_mesh'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shadow-sm'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  <Box className="h-3.5 w-3.5" />
+                  <span>3D Skeletal Rig Mesh (Three.js)</span>
+                </button>
+              </div>
+
+              <span className="text-[11px] text-neutral-400 font-mono hidden md:inline">
+                {viewerMode === 'photorealistic' ? '★ Live Top-Body Digital Human with Lip-Sync' : 'Three.js 3D Skeletal Rig'}
+              </span>
+            </div>
+
             <div className="h-[560px] rounded-2xl overflow-hidden shadow-2xl relative border border-cyan-500/25">
-              <ThreeCanvasViewer
-                portraitTextureUrl={avatar.image_url || '/avatars/aurora_hologram.jpg'}
-                isSpeaking={isSpeaking}
-                gesture={activeGesture}
-                cameraPreset={cameraPreset}
-                lightingTheme={lightingTheme}
-                wireframe={wireframe}
-                gender={avatar.settings_json?.detected_gender || avatar.gender_presentation || 'Female'}
-                skinTone={avatar.settings_json?.skin_tone}
-                hairColor={avatar.settings_json?.hair_color}
-                clothingColor={avatar.settings_json?.clothing_color}
-                enableControls={true}
-                onCameraChange={(p) => setCameraPreset(p)}
-              />
+              {viewerMode === 'photorealistic' ? (
+                <ThreeDAvatarStage
+                  imageUrl={avatar.image_url || '/avatars/aurora_hologram.jpg'}
+                  name={avatar.name}
+                  isSpeaking={isSpeaking}
+                  gesture={activeGesture}
+                  selectedLanguage={selectedLanguage}
+                  stageMode={stageMode}
+                  onToggleStageMode={() => setStageMode(stageMode === 'hologram' ? 'portrait' : 'hologram')}
+                  mouthPos={mouthPos}
+                  onMouthPosChange={(pos) => setMouthPos(pos)}
+                />
+              ) : (
+                <ThreeCanvasViewer
+                  portraitTextureUrl={avatar.image_url || '/avatars/aurora_hologram.jpg'}
+                  isSpeaking={isSpeaking}
+                  gesture={activeGesture}
+                  cameraPreset={cameraPreset}
+                  lightingTheme={lightingTheme}
+                  wireframe={wireframe}
+                  gender={avatar.settings_json?.detected_gender || avatar.gender_presentation || 'Female'}
+                  skinTone={avatar.settings_json?.skin_tone}
+                  hairColor={avatar.settings_json?.hair_color}
+                  clothingColor={avatar.settings_json?.clothing_color}
+                  enableControls={true}
+                  onCameraChange={(p) => setCameraPreset(p)}
+                />
+              )}
             </div>
 
             {/* Viewport Control Bar */}
             <div className="glass-panel p-4 rounded-xl border border-white/5 flex flex-wrap items-center justify-between gap-4 text-xs">
               
-              {/* Lighting Preset */}
-              <div className="flex items-center gap-2">
-                <span className="text-neutral-400 flex items-center gap-1 font-mono text-[11px]">
-                  <Sun className="h-3.5 w-3.5 text-cyan-400" /> Lighting:
-                </span>
-                <select
-                  value={lightingTheme}
-                  onChange={(e) => setLightingTheme(e.target.value as LightingTheme)}
-                  className="bg-neutral-900 border border-white/10 text-neutral-200 rounded-lg px-2.5 py-1 text-xs focus:ring-1 focus:ring-cyan-400"
-                >
-                  <option value="warm_studio">Warm Studio</option>
-                  <option value="cyber_hologram">Cyber Hologram</option>
-                  <option value="classroom_natural">Classroom Natural</option>
-                </select>
-              </div>
+              {viewerMode === 'skeletal_mesh' ? (
+                <>
+                  {/* Lighting Preset */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-neutral-400 flex items-center gap-1 font-mono text-[11px]">
+                      <Sun className="h-3.5 w-3.5 text-cyan-400" /> Lighting:
+                    </span>
+                    <select
+                      value={lightingTheme}
+                      onChange={(e) => setLightingTheme(e.target.value as LightingTheme)}
+                      className="bg-neutral-900 border border-white/10 text-neutral-200 rounded-lg px-2.5 py-1 text-xs focus:ring-1 focus:ring-cyan-400"
+                    >
+                      <option value="warm_studio">Warm Studio</option>
+                      <option value="cyber_hologram">Cyber Hologram</option>
+                      <option value="classroom_natural">Classroom Natural</option>
+                    </select>
+                  </div>
 
-              {/* Wireframe Toggle */}
-              <button
-                type="button"
-                onClick={() => setWireframe(!wireframe)}
-                className={`px-3 py-1.5 rounded-lg border flex items-center gap-1.5 font-medium transition-all ${
-                  wireframe
-                    ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
-                    : 'bg-white/5 border-white/10 text-neutral-300 hover:text-white'
-                }`}
-              >
-                <Layers className="h-3.5 w-3.5" />
-                <span>Wireframe Mesh: {wireframe ? 'ON' : 'OFF'}</span>
-              </button>
+                  {/* Wireframe Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setWireframe(!wireframe)}
+                    className={`px-3 py-1.5 rounded-lg border flex items-center gap-1.5 font-medium transition-all ${
+                      wireframe
+                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
+                        : 'bg-white/5 border-white/10 text-neutral-300 hover:text-white'
+                    }`}
+                  >
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>Wireframe Mesh: {wireframe ? 'ON' : 'OFF'}</span>
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 text-neutral-400 font-mono text-[11px]">
+                  <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>Mode: {stageMode === 'hologram' ? 'Cyber Holographic Room' : 'Top-Body 3D Studio Bust'}</span>
+                </div>
+              )}
 
               {/* Save Settings */}
               <button

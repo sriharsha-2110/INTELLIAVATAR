@@ -8,24 +8,30 @@ interface ThreeDAvatarStageProps {
   imageUrl: string;
   name: string;
   isSpeaking: boolean;
-  isThinking: boolean;
-  isRecording: boolean;
+  isThinking?: boolean;
+  isRecording?: boolean;
   stageMode?: 'hologram' | 'portrait';
   onToggleStageMode?: () => void;
   selectedLanguage?: string;
   emotion?: string;
+  gesture?: string;
+  mouthPos?: { x: number; y: number };
+  onMouthPosChange?: (pos: { x: number; y: number }) => void;
 }
 
 export default function ThreeDAvatarStage({
   imageUrl,
   name,
   isSpeaking,
-  isThinking,
-  isRecording,
-  stageMode = 'hologram',
+  isThinking = false,
+  isRecording = false,
+  stageMode = 'portrait',
   onToggleStageMode,
   selectedLanguage = 'en',
   emotion = 'NEUTRAL',
+  gesture,
+  mouthPos,
+  onMouthPosChange,
 }: ThreeDAvatarStageProps) {
   // 3D Parallax Perspective state
   const [rotateX, setRotateX] = useState(0);
@@ -38,13 +44,27 @@ export default function ThreeDAvatarStage({
   const [isBlinking, setIsBlinking] = useState(false);
   const [headTilt, setHeadTilt] = useState(0);
 
-  // Mouth/Jaw calibration anchor (percentage of image height/width)
-  // Default centered for Aurora-7 and standard portrait photos
-  const [mouthPosition, setMouthPosition] = useState<{ x: number; y: number }>({
-    x: stageMode === 'hologram' ? 52.8 : 50.0,
-    y: stageMode === 'hologram' ? 24.8 : 62.0,
-  });
+  // Determine initial mouth anchor based on photo type
+  const isAuroraPreset = imageUrl?.includes('aurora');
+  const [mouthPosition, setMouthPosition] = useState<{ x: number; y: number }>(
+    mouthPos || {
+      x: isAuroraPreset ? (stageMode === 'hologram' ? 52.8 : 50.0) : 50.0,
+      y: isAuroraPreset ? (stageMode === 'hologram' ? 24.8 : 62.0) : 62.0,
+    }
+  );
   const [isCalibrating, setIsCalibrating] = useState(false);
+
+  useEffect(() => {
+    if (mouthPos) {
+      setMouthPosition(mouthPos);
+    } else {
+      const isAurora = imageUrl?.includes('aurora');
+      setMouthPosition({
+        x: isAurora ? (stageMode === 'hologram' ? 52.8 : 50.0) : 50.0,
+        y: isAurora ? (stageMode === 'hologram' ? 24.8 : 62.0) : 62.0,
+      });
+    }
+  }, [imageUrl, stageMode, mouthPos]);
 
   // 1. Natural Eye Blinking cycle (every 3.5 to 5 seconds)
   useEffect(() => {
@@ -118,7 +138,9 @@ export default function ThreeDAvatarStage({
     const rect = containerRef.current.getBoundingClientRect();
     const clickX = ((e.clientX - rect.left) / rect.width) * 100;
     const clickY = ((e.clientY - rect.top) / rect.height) * 100;
-    setMouthPosition({ x: Math.round(clickX * 10) / 10, y: Math.round(clickY * 10) / 10 });
+    const newPos = { x: Math.round(clickX * 10) / 10, y: Math.round(clickY * 10) / 10 };
+    setMouthPosition(newPos);
+    onMouthPosChange?.(newPos);
     setIsCalibrating(false);
   };
 
@@ -141,9 +163,18 @@ export default function ThreeDAvatarStage({
         } ${isCalibrating ? 'cursor-crosshair' : 'cursor-default'}`}
       >
         {/* Top HUD Badges */}
-        <div className="absolute top-3 left-3 z-30 flex items-center gap-1.5 px-3 py-1 rounded-full bg-dark-950/85 border border-cyan-500/30 text-[10px] text-cyan-300 backdrop-blur-md font-mono shadow-md">
-          <ShieldCheck className="h-3 w-3 text-cyan-400" />
-          <span>3D NEURAL TALKING HUMAN</span>
+        <div className="absolute top-3 left-3 z-30 flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-dark-950/85 border border-cyan-500/30 text-[10px] text-cyan-300 backdrop-blur-md font-mono shadow-md">
+            <ShieldCheck className="h-3 w-3 text-cyan-400" />
+            <span>3D TALKING HUMAN</span>
+          </div>
+
+          {gesture && gesture !== 'idle' && (
+            <div className="px-2.5 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-[10px] text-cyan-200 font-mono backdrop-blur-md flex items-center gap-1 animate-pulse">
+              <Sparkles className="h-3 w-3 text-cyan-400" />
+              <span>{gesture.toUpperCase().replace('_', ' ')}</span>
+            </div>
+          )}
         </div>
 
         <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
@@ -230,13 +261,18 @@ export default function ThreeDAvatarStage({
                 }`}
               />
             ) : (
-              /* Portrait Talking-Head Focused Circle */
-              <div className="relative w-64 h-64 rounded-full border-2 border-cyan-400/80 overflow-hidden flex items-center justify-center bg-dark-950 shadow-[0_0_40px_rgba(6,182,212,0.4)]">
+              /* 3D Top-Body Digital Human Bust */
+              <div className="relative h-full max-h-[94%] w-auto aspect-[3/4] max-w-[88%] rounded-3xl overflow-hidden border border-cyan-500/40 bg-gradient-to-b from-slate-900/80 via-dark-950 to-black shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(6,182,212,0.25)] flex items-center justify-center">
                 <img
                   src={imageUrl || '/avatars/aurora_hologram.jpg'}
                   alt={name}
-                  className="w-full h-full object-cover object-top scale-150 pointer-events-none"
+                  className={`w-full h-full object-cover object-top pointer-events-none transition-all duration-300 ${
+                    isSpeaking ? 'filter brightness-105 contrast-105' : ''
+                  }`}
                 />
+                {/* Subtle depth vignette & rim lighting */}
+                <div className="absolute inset-0 bg-gradient-to-t from-dark-950/80 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute inset-0 rounded-3xl border border-cyan-400/20 pointer-events-none" />
               </div>
             )}
 
@@ -371,7 +407,7 @@ export default function ThreeDAvatarStage({
               className="px-3 py-1.5 rounded-lg bg-neutral-900 border border-white/10 hover:border-cyan-500/40 hover:bg-cyan-500/10 text-neutral-300 text-xs font-medium flex items-center gap-1.5 transition-colors"
             >
               <Sliders className="h-3.5 w-3.5 text-cyan-400" />
-              <span>{stageMode === 'hologram' ? 'Switch to Portrait Head' : 'Switch to Full Hologram'}</span>
+              <span>{stageMode === 'hologram' ? 'Switch to Top-Body Bust' : 'Switch to Cyber Hologram'}</span>
             </button>
           )}
 

@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import ThreeDAvatarStage from '../components/ThreeDAvatarStage';
 import ThreeCanvasViewer, { CameraPreset } from '../components/ThreeCanvasViewer';
 import DigitalWhiteboard, { LessonStep } from '../components/DigitalWhiteboard';
 import { TeachingGesture } from '../components/ThreeDHumanoidModel';
 import { 
   BookOpen, ArrowLeft, Send, Sparkles, Volume2, 
   VolumeX, Play, Pause, RotateCcw, CheckCircle, 
-  HelpCircle, MessageSquare, Layers, Maximize2
+  HelpCircle, MessageSquare, Layers, Maximize2, Eye, Box
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -65,6 +66,9 @@ export default function AITeacherMode() {
   const { avatarId } = useParams<{ avatarId: string }>();
 
   const [avatar, setAvatar] = useState<any>(null);
+  const [viewerMode, setViewerMode] = useState<'photorealistic' | 'skeletal_mesh'>('photorealistic');
+  const [stageMode, setStageMode] = useState<'hologram' | 'portrait'>('hologram');
+  const [mouthPos, setMouthPos] = useState<{ x: number; y: number } | undefined>(undefined);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [activeGesture, setActiveGesture] = useState<TeachingGesture>('explain_two_hands');
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -84,6 +88,12 @@ export default function AITeacherMode() {
     if (found) {
       setAvatar(found);
       setSelectedLanguage(found.language || 'en');
+      if (found.settings_json?.stage_mode) {
+        setStageMode(found.settings_json.stage_mode);
+      }
+      if (found.settings_json?.mouth_pos) {
+        setMouthPos(found.settings_json.mouth_pos);
+      }
     } else {
       setAvatar({
         id: avatarId || 'aurora-7',
@@ -246,6 +256,32 @@ export default function AITeacherMode() {
               </button>
             </div>
 
+            {/* Model Mode Toggle */}
+            <div className="flex rounded-xl bg-white/5 border border-white/10 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setViewerMode('photorealistic')}
+                className={`px-2.5 py-1 rounded-lg font-medium flex items-center gap-1 transition-all ${
+                  viewerMode === 'photorealistic' ? 'bg-cyan-500/20 text-cyan-300' : 'text-neutral-400'
+                }`}
+                title="Photorealistic 3D Digital Human with Viseme Lip-Sync"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">3D Human</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewerMode('skeletal_mesh')}
+                className={`px-2.5 py-1 rounded-lg font-medium flex items-center gap-1 transition-all ${
+                  viewerMode === 'skeletal_mesh' ? 'bg-cyan-500/20 text-cyan-300' : 'text-neutral-400'
+                }`}
+                title="3D Skeletal Rig Mesh (Three.js)"
+              >
+                <Box className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">3D Rig</span>
+              </button>
+            </div>
+
             {/* Audio Mute */}
             <button
               type="button"
@@ -277,18 +313,32 @@ export default function AITeacherMode() {
               : 'lg:col-span-5'
           } rounded-2xl overflow-hidden shadow-2xl relative border border-cyan-500/30 flex flex-col`}>
             
-            <ThreeCanvasViewer
-              portraitTextureUrl={avatar.image_url || '/avatars/aurora_hologram.jpg'}
-              isSpeaking={isSpeaking}
-              gesture={activeGesture}
-              cameraPreset="classroom"
-              lightingTheme="classroom_natural"
-              gender={avatar.settings_json?.detected_gender || avatar.gender_presentation || 'Female'}
-              skinTone={avatar.settings_json?.skin_tone}
-              hairColor={avatar.settings_json?.hair_color}
-              clothingColor={avatar.settings_json?.clothing_color}
-              enableControls={true}
-            />
+            {viewerMode === 'photorealistic' ? (
+              <ThreeDAvatarStage
+                imageUrl={avatar.image_url || '/avatars/aurora_hologram.jpg'}
+                name={avatar.name}
+                isSpeaking={isSpeaking}
+                gesture={activeGesture}
+                selectedLanguage={selectedLanguage}
+                stageMode={stageMode}
+                onToggleStageMode={() => setStageMode(stageMode === 'hologram' ? 'portrait' : 'hologram')}
+                mouthPos={mouthPos}
+                onMouthPosChange={(pos) => setMouthPos(pos)}
+              />
+            ) : (
+              <ThreeCanvasViewer
+                portraitTextureUrl={avatar.image_url || '/avatars/aurora_hologram.jpg'}
+                isSpeaking={isSpeaking}
+                gesture={activeGesture}
+                cameraPreset="classroom"
+                lightingTheme="classroom_natural"
+                gender={avatar.settings_json?.detected_gender || avatar.gender_presentation || 'Female'}
+                skinTone={avatar.settings_json?.skin_tone}
+                hairColor={avatar.settings_json?.hair_color}
+                clothingColor={avatar.settings_json?.clothing_color}
+                enableControls={true}
+              />
+            )}
 
             {/* Teacher Speech Transcript Caption Box */}
             <div className="absolute bottom-3 left-3 right-3 z-30 p-3 rounded-xl bg-dark-950/85 backdrop-blur-md border border-cyan-500/30 text-xs text-neutral-200 flex items-start gap-2.5 shadow-xl">
