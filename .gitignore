@@ -1,17 +1,7 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
+# Environment variables
+.env
 *.env
-.pytest_cache/
-test_temp.db
-test_temp.db-journal
-*.db
-*.sqlite
-*.sqlite3
-.venv/
-venv/
-ENV/
+.env.local
 
 # Node
 node_modules/
@@ -19,11 +9,22 @@ dist/
 .eslintcache
 *.local
 
+# Database & Cache
+*.sqlite
+*.sqlite3
+*.db
+test_temp.db
+test_temp.db-journal
+.pytest_cache/
+__pycache__/
+
+# Archived legacy
+_legacy_v1/
+
 # OS
 .DS_Store
 Thumbs.db
 
-# Dynamic Uploads (keep default aurora_hologram)
-backend/uploads/avatars/*
-!backend/uploads/avatars/aurora_hologram.jpg
-backend/uploads/models/*
+# Dynamic Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep

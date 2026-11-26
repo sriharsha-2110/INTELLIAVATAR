@@ -1,167 +1,119 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Cpu, Mail, Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Cpu, ArrowRight, ShieldCheck, Mail, Lock, User as UserIcon } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
+import axios from 'axios';
+
+const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api';
 
 export default function Register() {
+  const navigate = useNavigate();
+  const { login } = useAuthStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [orgName, setOrgName] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setIsLoading(true);
-    setError('');
 
-    // Stage 1/2 Mock Signup
-    setTimeout(() => {
-      if (name && email && password && orgName) {
-        localStorage.setItem('token', 'mock-jwt-token-abcd');
-        localStorage.setItem('user_email', email);
-        localStorage.setItem('organization_name', orgName);
-        localStorage.setItem('organization_id', 'mock-org-uuid-1234');
-        navigate('/dashboard');
-      } else {
-        setError('Please fill in all the fields.');
+    try {
+      const res = await axios.post(`${API_BASE}/auth/register`, { name, email, password });
+      if (res.data?.token && res.data?.user) {
+        login(res.data.token, res.data.user);
+        navigate('/');
+        return;
       }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Registration failed.');
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-dark-950 text-white flex flex-col justify-center items-center px-6 relative overflow-hidden">
-      {/* Background radial highlight */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-brand-500/10 rounded-full blur-[100px] pointer-events-none" />
-
-      <div className="w-full max-w-md space-y-8 relative z-10">
-        {/* Branding */}
-        <div className="flex flex-col items-center">
-          <Link to="/" className="flex items-center gap-2 mb-2">
-            <Cpu className="h-8 w-8 text-brand-500" />
-            <span className="font-display font-bold text-2xl tracking-wider bg-gradient-to-r from-white to-brand-400 bg-clip-text text-transparent">
-              INTELLIAVATAR
-            </span>
-          </Link>
-          <p className="text-sm text-neutral-400">Create your account and organize your workspaces</p>
-        </div>
-
-        {/* Card */}
-        <div className="glass-panel p-8 rounded-2xl border border-white/10 shadow-2xl">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/25 text-xs text-rose-400 text-center">
-                {error}
-              </div>
-            )}
-
-            {/* Name */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-neutral-300 uppercase tracking-wider block">
-                Full Name
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-neutral-500">
-                  <User className="h-4 w-4" />
-                </span>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="John Doe"
-                  className="w-full pl-10 pr-4 py-2 bg-neutral-900/60 border border-white/10 rounded-xl focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm outline-none transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* Organization */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-neutral-300 uppercase tracking-wider block">
-                Organization Name
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-neutral-500">
-                  <Cpu className="h-4 w-4" />
-                </span>
-                <input
-                  type="text"
-                  required
-                  value={orgName}
-                  onChange={(e) => setOrgName(e.target.value)}
-                  placeholder="Acme University / Support Team"
-                  className="w-full pl-10 pr-4 py-2 bg-neutral-900/60 border border-white/10 rounded-xl focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm outline-none transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* Email */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-neutral-300 uppercase tracking-wider block">
-                Email Address
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-neutral-500">
-                  <Mail className="h-4 w-4" />
-                </span>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@organization.com"
-                  className="w-full pl-10 pr-4 py-2 bg-neutral-900/60 border border-white/10 rounded-xl focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm outline-none transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* Password */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-neutral-300 uppercase tracking-wider block">
-                Password
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-neutral-500">
-                  <Lock className="h-4 w-4" />
-                </span>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2 bg-neutral-900/60 border border-white/10 rounded-xl focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm outline-none transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full mt-4 py-2.5 px-4 bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:cursor-not-allowed font-semibold rounded-xl flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_15px_rgba(59,102,255,0.3)] text-sm"
-            >
-              {isLoading ? 'Creating Account...' : 'Register'}
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </form>
-
-          {/* Prompt */}
-          <div className="mt-4 text-center text-xs text-neutral-400">
-            Already have an account?{' '}
-            <Link to="/login" className="text-brand-400 hover:underline">
-              Sign in
-            </Link>
+    <div className="min-h-screen bg-[#0c0f17] text-white flex flex-col items-center justify-center p-4">
+      <div className="max-w-md w-full p-8 rounded-3xl bg-slate-900/80 border border-white/10 shadow-2xl space-y-6">
+        
+        {/* Logo */}
+        <div className="flex flex-col items-center text-center space-y-2">
+          <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-cyan-400 flex items-center justify-center shadow-[0_0_25px_rgba(99,102,241,0.5)]">
+            <Cpu className="h-6 w-6 text-white" />
           </div>
+          <h2 className="text-xl font-extrabold tracking-tight">Create Educator Account</h2>
+          <p className="text-xs text-neutral-400">Join the INTELLIAVATAR 2.0 3D Teaching Platform</p>
         </div>
 
-        {/* Security disclosure */}
-        <div className="flex items-center justify-center gap-2 text-[10px] text-neutral-500 uppercase tracking-widest">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          <span>Organization Data Separation Assured</span>
-        </div>
+        {error && (
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="text-neutral-300 block mb-1">Full Name</label>
+            <div className="relative">
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Professor Sarah Jenkins"
+                className="w-full bg-neutral-950 border border-white/10 rounded-xl px-4 py-2.5 pl-10 text-white focus:outline-none focus:border-cyan-400"
+              />
+              <UserIcon className="h-4 w-4 text-neutral-500 absolute left-3.5 top-3" />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-neutral-300 block mb-1">Email Address</label>
+            <div className="relative">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="teacher@school.edu"
+                className="w-full bg-neutral-950 border border-white/10 rounded-xl px-4 py-2.5 pl-10 text-white focus:outline-none focus:border-cyan-400"
+              />
+              <Mail className="h-4 w-4 text-neutral-500 absolute left-3.5 top-3" />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-neutral-300 block mb-1">Password</label>
+            <div className="relative">
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 6 characters"
+                className="w-full bg-neutral-950 border border-white/10 rounded-xl px-4 py-2.5 pl-10 text-white focus:outline-none focus:border-cyan-400"
+              />
+              <Lock className="h-4 w-4 text-neutral-500 absolute left-3.5 top-3" />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-bold text-xs shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50"
+          >
+            {isLoading ? 'Creating Account...' : 'Register as Educator'}
+          </button>
+        </form>
+
+        <p className="text-[11px] text-center text-neutral-400">
+          Already have an account?{' '}
+          <Link to="/login" className="text-cyan-400 hover:underline font-semibold">
+            Sign in
+          </Link>
+        </p>
       </div>
     </div>
   );

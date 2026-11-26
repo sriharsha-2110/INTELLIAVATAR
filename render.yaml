@@ -1,33 +1,45 @@
 services:
-  # 1. FastAPI Backend Web Service
+  # 1. INTELLIAVATAR 2.0 Backend Web Service (Node.js / Express / TypeScript)
   - type: web
     name: intelliavatar-backend
-    runtime: python
+    runtime: node
     region: oregon
     plan: free
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     healthCheckPath: /health
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: PORT
+        value: 10000
       - key: JWT_SECRET
         generateValue: true
-      - key: AVATAR_ENGINE
-        value: parametric-3d
-      - key: LIPSYNC_ENGINE
-        value: wav2lip
-      - key: LLM_PROVIDER
-        value: mock
-      - key: TTS_PROVIDER
-        value: edge-tts
-      - key: ASR_PROVIDER
-        value: mock
-      - key: DATABASE_URL
-        value: sqlite:///./intelliavatar.db
+      - key: MONGODB_URI
+        sync: false
+      - key: FRONTEND_URL
+        value: https://intelliavatar-frontend.onrender.com
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: AVATAR_PROVIDER_API_KEY
+        sync: false
+      - key: AVATAR_PROVIDER_BASE_URL
+        value: https://api.avatarsdk.com
+      - key: AZURE_SPEECH_KEY
+        sync: false
+      - key: AZURE_SPEECH_REGION
+        value: eastus
 
-  # 2. Vite React 3D Frontend Static Site
+  # 2. INTELLIAVATAR 2.0 Frontend Static Site (React 18 / Vite / Three.js)
   - type: web
     name: intelliavatar-frontend
     runtime: static
@@ -43,4 +55,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://intelliavatar-backend.onrender.com/api/v1
+        value: https://intelliavatar-backend.onrender.com/api
