@@ -89,6 +89,18 @@ class Avatar(Base):
     is_public = Column(Boolean, default=False)
     avatar_engine = Column(String(100), default="mock")
     lipsync_engine = Column(String(100), default="mock")
+    
+    # 3D Digital Human Avatar Extensions
+    avatar_type = Column(String(50), default="3D")  # '3D' or '2D'
+    model_url = Column(String(512), nullable=True)  # URL/Path to 3D model asset (.glb / .vrm)
+    model_format = Column(String(20), default="glb")  # 'glb' or 'vrm'
+    thumbnail_url = Column(String(512), nullable=True)  # Thumbnail image path
+    generation_status = Column(String(50), default="COMPLETED")  # PENDING, PROCESSING, COMPLETED, FAILED
+    generation_provider = Column(String(100), default="parametric-3d")
+    settings_json = Column(JSON, nullable=True)  # Lighting, scale, camera presets, whiteboard theme
+    is_deleted = Column(Boolean, default=False)  # Soft delete
+    deleted_at = Column(DateTime, nullable=True)
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

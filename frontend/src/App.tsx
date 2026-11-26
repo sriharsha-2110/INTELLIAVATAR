@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import AvatarCreator from './pages/AvatarCreator';
+import AvatarStudio from './pages/AvatarStudio';
+import AITeacherMode from './pages/AITeacherMode';
 import ChatInterface from './pages/ChatInterface';
 import AITutor from './pages/AITutor';
 import TalkToPDF from './pages/TalkToPDF';
@@ -10,9 +12,14 @@ import AdminPanel from './pages/AdminPanel';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
-// Simple Auth check state helper (we'll expand this in Stage 2)
+// Auth check helper - supports guest/demo session seamlessly
 const isAuthenticated = () => {
-  return !!localStorage.getItem('token');
+  // If no token exists, initialize a guest session so user is never locked out of creation or chat
+  if (!localStorage.getItem('token')) {
+    localStorage.setItem('token', 'demo-workspace-token');
+    localStorage.setItem('user_email', 'guest@intelliavatar.ai');
+  }
+  return true;
 };
 
 // Protected route wrapper
@@ -43,6 +50,22 @@ function App() {
           element={
             <ProtectedRoute>
               <AvatarCreator />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/studio/:avatarId"
+          element={
+            <ProtectedRoute>
+              <AvatarStudio />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/:avatarId"
+          element={
+            <ProtectedRoute>
+              <AITeacherMode />
             </ProtectedRoute>
           }
         />

@@ -15,8 +15,8 @@ export default function Navbar() {
 
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Create Avatar', path: '/creator', icon: UserPlus },
-    { name: 'IntelliTutor', path: '/tutor', icon: BookOpen },
+    { name: 'Create 3D Avatar', path: '/creator', icon: UserPlus },
+    { name: '3D Classroom', path: '/teacher/aurora-7', icon: BookOpen },
     { name: 'Talk-To-PDF', path: '/talk-to-pdf', icon: FileText },
     { name: 'Research Lab', path: '/research', icon: FlaskConical },
     { name: 'Admin', path: '/admin', icon: ShieldAlert },

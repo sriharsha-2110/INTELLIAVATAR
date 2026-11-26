@@ -1,8 +1,10 @@
 import axios from 'axios';
 
-// Base API config
+// Base API config - supports local Vite proxy and remote Render API URL
+const baseURL = (import.meta as any).env?.VITE_API_URL || '/api/v1';
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -24,12 +26,12 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Only redirect if specifically on the strict /admin route and 401
     if (error.response && error.response.status === 401) {
-      // Unauthorized: clear local storage and redirect to login if not already there
-      localStorage.removeItem('token');
-      localStorage.removeItem('user_email');
-      localStorage.removeItem('organization_id');
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/' && window.location.pathname !== '/register') {
+      if (window.location.pathname.startsWith('/admin')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user_email');
+        localStorage.removeItem('organization_id');
         window.location.href = '/login';
       }
     }

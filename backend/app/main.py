@@ -1,4 +1,6 @@
+import os
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.models.registry import registry
@@ -12,6 +14,7 @@ from app.models.adapters.wav2lip import Wav2LipEngine
 from app.models.adapters.whisper_asr import WhisperASREngine
 from app.models.adapters.openai_llm import OpenAILLMProvider
 from app.models.adapters.ollama_llm import OllamaLLMProvider
+from app.models.adapters.three_d_generator import Parametric3DGenerator
 
 # Router Imports
 from app.api.auth import router as auth_router
@@ -36,6 +39,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Uploads directory for static avatar images and 3D models
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+os.makedirs(os.path.join(settings.UPLOAD_DIR, "avatars"), exist_ok=True)
+os.makedirs(os.path.join(settings.UPLOAD_DIR, "models"), exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 # Include Routers
 app.include_router(auth_router, prefix=settings.API_V1_STR)
@@ -62,6 +71,7 @@ def startup_event():
     registry.register_llm("openai", OpenAILLMProvider())
     registry.register_llm("ollama", OllamaLLMProvider())
     registry.register_emotion("mock", MockEmotionEngine())
+    registry.register_3d_generator("parametric-3d", Parametric3DGenerator(settings.UPLOAD_DIR))
     
     print("IntelliAvatar model adapters successfully registered.")
 

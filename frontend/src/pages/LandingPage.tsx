@@ -68,29 +68,47 @@ export default function LandingPage() {
 
         {/* Right column: Interactive Preview Area */}
         <div className="flex-1 w-full max-w-lg lg:max-w-none flex justify-center">
-          <div className="relative w-full aspect-square max-w-[450px] rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-gradient-to-tr from-brand-950/40 to-purple-950/40 p-4 group">
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-dark-950/40 to-dark-950 pointer-events-none z-10" />
-
+          <div className="relative w-full aspect-square max-w-[480px] rounded-3xl overflow-hidden border border-cyan-500/30 shadow-2xl bg-gradient-to-tr from-cyan-950/40 via-dark-950/80 to-purple-950/40 p-3 group">
             {/* Glowing orb backdrop */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2/3 h-2/3 bg-brand-500/20 rounded-full blur-[60px] group-hover:bg-brand-500/35 transition-colors duration-700" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 bg-cyan-500/20 rounded-full blur-[70px] group-hover:bg-cyan-500/30 transition-colors duration-700 pointer-events-none" />
 
-            {/* Simulated Digital Human Frame */}
-            <div className="w-full h-full rounded-2xl border border-white/5 bg-neutral-900/60 overflow-hidden flex flex-col items-center justify-center relative">
-              {/* Dynamic waveform avatar mockup visual */}
-              <div className="w-24 h-24 rounded-full border-2 border-brand-500/50 flex items-center justify-center relative mb-4">
-                <div className="absolute inset-0 rounded-full border-4 border-t-purple-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-                <Cpu className="h-10 w-10 text-brand-400" />
+            {/* Neural Digital Human Frame */}
+            <div className="w-full h-full rounded-2xl border border-cyan-500/30 bg-black overflow-hidden flex flex-col items-center justify-center relative shadow-[0_0_30px_rgba(6,182,212,0.2)]">
+              {/* Top HUD */}
+              <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between text-[10px] font-mono">
+                <span className="px-2.5 py-1 rounded-full bg-dark-950/80 border border-cyan-500/40 text-cyan-300">
+                  AURORA-7 // NEURAL CORE
+                </span>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  STATUS: ACTIVE
+                </span>
               </div>
-              <p className="font-display font-medium text-lg tracking-wide text-neutral-200">
-                AI Avatar Ready
-              </p>
-              <p className="text-xs text-neutral-400 mt-1 max-w-[240px] text-center">
-                Supports English, Kannada, Telugu, Hindi, Tamil & Malayalam
-              </p>
 
-              {/* Fake speech captions */}
-              <div className="absolute bottom-6 left-6 right-6 p-3 rounded-xl bg-dark-950/70 border border-white/5 backdrop-blur-md text-xs text-neutral-300 text-center">
-                "Hello, I am your intelligent tutor. How can I help you study today?"
+              {/* Holographic Avatar Image */}
+              <img
+                src="/avatars/aurora_hologram.jpg"
+                alt="Aurora-7 Neural Hologram"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+              />
+
+              {/* Holographic scanlines */}
+              <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/5 via-transparent to-cyan-500/15 pointer-events-none z-10" />
+
+              {/* Speech captions overlay */}
+              <div className="absolute bottom-4 left-4 right-4 z-20 p-3.5 rounded-xl bg-dark-950/85 border border-cyan-500/30 backdrop-blur-md flex items-center justify-between gap-3">
+                <div className="text-left">
+                  <span className="text-[10px] font-mono text-cyan-400 block uppercase">Spoken Greeting</span>
+                  <p className="text-xs text-neutral-200 mt-0.5 line-clamp-1">
+                    "Hello, I am Aurora-7. How can I help you learn today?"
+                  </p>
+                </div>
+                <Link
+                  to="/creator"
+                  className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs shrink-0 transition-colors"
+                >
+                  Create
+                </Link>
               </div>
             </div>
           </div>

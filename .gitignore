@@ -6,6 +6,9 @@ __pycache__/
 .pytest_cache/
 test_temp.db
 test_temp.db-journal
+*.db
+*.sqlite
+*.sqlite3
 .venv/
 venv/
 ENV/

@@ -114,6 +114,13 @@ class ModelRegistry:
         self._ttss: Dict[str, TTSEngine] = {}
         self._llms: Dict[str, LLMProvider] = {}
         self._emotions: Dict[str, EmotionEngine] = {}
+        self._three_d_generators: Dict[str, Any] = {}
+
+    def register_3d_generator(self, name: str, engine: Any) -> None:
+        self._three_d_generators[name] = engine
+
+    def get_3d_generator(self, name: str) -> Any:
+        return self._three_d_generators.get(name)
 
     def register_avatar(self, name: str, engine: AvatarEngine) -> None:
         self._avatars[name] = engine

@@ -1,0 +1,46 @@
+services:
+  # 1. FastAPI Backend Web Service
+  - type: web
+    name: intelliavatar-backend
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AVATAR_ENGINE
+        value: parametric-3d
+      - key: LIPSYNC_ENGINE
+        value: wav2lip
+      - key: LLM_PROVIDER
+        value: mock
+      - key: TTS_PROVIDER
+        value: edge-tts
+      - key: ASR_PROVIDER
+        value: mock
+      - key: DATABASE_URL
+        value: sqlite:///./intelliavatar.db
+
+  # 2. Vite React 3D Frontend Static Site
+  - type: web
+    name: intelliavatar-frontend
+    runtime: static
+    region: oregon
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      # React Router SPA catch-all rewrite
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://intelliavatar-backend.onrender.com/api/v1
