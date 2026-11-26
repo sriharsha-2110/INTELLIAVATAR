@@ -17,6 +17,9 @@ interface ThreeCanvasViewerProps {
   lightingTheme?: LightingTheme;
   wireframe?: boolean;
   gender?: string;
+  skinTone?: string;
+  hairColor?: string;
+  clothingColor?: string;
   enableControls?: boolean;
   onCameraChange?: (preset: CameraPreset) => void;
 }
@@ -103,7 +106,10 @@ export default function ThreeCanvasViewer({
   cameraPreset = 'classroom',
   lightingTheme = 'warm_studio',
   wireframe = false,
-  gender = 'female',
+  gender = 'Female',
+  skinTone,
+  hairColor,
+  clothingColor,
   enableControls = true,
   onCameraChange,
 }: ThreeCanvasViewerProps) {
@@ -144,6 +150,9 @@ export default function ThreeCanvasViewer({
             emotion={emotion}
             wireframe={wireframe}
             gender={gender}
+            skinTone={skinTone}
+            hairColor={hairColor}
+            clothingColor={clothingColor}
           />
 
           {/* Realistic Floor Soft Shadow */}

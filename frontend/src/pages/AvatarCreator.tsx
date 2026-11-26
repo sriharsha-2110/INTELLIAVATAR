@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import ThreeCanvasViewer, { CameraPreset } from '../components/ThreeCanvasViewer';
 import ImageCropModal from '../components/ImageCropModal';
+import { analyzeHumanPortrait, DetectedHumanProfile } from '../utils/faceAnalysis';
 import { 
   Upload, Check, Volume2, ShieldAlert, Cpu, Heart, 
   Sparkles, Sliders, Play, RotateCcw, Eye, ShieldCheck,
-  CheckCircle2, AlertCircle, Crop, Loader2
+  CheckCircle2, AlertCircle, Crop, Loader2, UserCheck
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -31,6 +32,9 @@ export default function AvatarCreator() {
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const [rawImageForCrop, setRawImageForCrop] = useState<string | null>(null);
 
+  // Human person verification & likeness extraction
+  const [humanProfile, setHumanProfile] = useState<DetectedHumanProfile | null>(null);
+
   // Generation progress state
   const [isGenerating3D, setIsGenerating3D] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -40,6 +44,25 @@ export default function AvatarCreator() {
   // File Upload State
   const [previewImage, setPreviewImage] = useState<string>('/avatars/aurora_hologram.jpg');
   const [imageFile, setImageFile] = useState<File | null>(null);
+
+  // Automatic Human Being & Likeness Analysis on image update
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = async () => {
+      const profile = await analyzeHumanPortrait(img);
+      setHumanProfile(profile);
+      if (!profile.isHuman) {
+        setValidationError(profile.validationMessage || 'Notice: Could not identify a front-facing human face. Please ensure a clear photo of a person.');
+      } else {
+        setValidationError(null);
+        if (profile.gender) {
+          setGenderPresentation(profile.gender === 'Female' ? 'Female / Holographic AI' : 'Male / Professor');
+        }
+      }
+    };
+    img.src = previewImage;
+  }, [previewImage]);
   const [imageQuality, setImageQuality] = useState<{
     faceDetected: boolean;
     resolution: string;
@@ -212,6 +235,10 @@ export default function AvatarCreator() {
           camera_preset: cameraPreset,
           lighting: 'warm_studio',
           classroom_theme: 'modern_wood',
+          skin_tone: humanProfile?.skinTone || '#e0b8a3',
+          hair_color: humanProfile?.hairColor || '#1a1412',
+          clothing_color: humanProfile?.clothingColor || '#1e293b',
+          detected_gender: humanProfile?.gender || 'Female',
         },
         created_at: new Date().toISOString(),
       };
@@ -332,14 +359,17 @@ export default function AvatarCreator() {
                 </span>
               </div>
 
-              {/* Real Three.js Canvas Viewer */}
+              {/* Real Three.js Canvas Viewer with Imaged Person Face & Likeness */}
               <div className="w-full h-72 rounded-xl overflow-hidden shadow-2xl relative border border-cyan-500/30">
                 <ThreeCanvasViewer
                   portraitTextureUrl={previewImage}
                   isSpeaking={isPlayingVoiceSample}
                   gesture="explain_one_hand"
                   cameraPreset={cameraPreset}
-                  gender={genderPresentation}
+                  gender={humanProfile?.gender || genderPresentation}
+                  skinTone={humanProfile?.skinTone}
+                  hairColor={humanProfile?.hairColor}
+                  clothingColor={humanProfile?.clothingColor}
                   enableControls={true}
                   onCameraChange={(p) => setCameraPreset(p)}
                 />
@@ -369,6 +399,44 @@ export default function AvatarCreator() {
                   {isPlayingVoiceSample ? 'Lip-Syncing Speech...' : 'Test Speech Visemes'}
                 </button>
               </div>
+
+              {/* Automatic Person Verification & Likeness Status Card */}
+              {humanProfile && (
+                <div className="p-3 bg-white/[0.03] border border-white/10 rounded-xl space-y-2 text-xs font-mono">
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-400 flex items-center gap-1.5">
+                      <UserCheck className="h-3.5 w-3.5 text-cyan-400" />
+                      Human Being Check:
+                    </span>
+                    <span className={`font-semibold flex items-center gap-1 ${
+                      humanProfile.isHuman ? 'text-emerald-400' : 'text-amber-400'
+                    }`}>
+                      {humanProfile.isHuman ? '✓ Verified Person' : '⚠️ Non-Human Detected'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-400">Detected Gender:</span>
+                    <span className="text-cyan-300 font-semibold px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">
+                      {humanProfile.gender} Model Rig
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-400">Extracted Tones:</span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1" title={`Skin Tone: ${humanProfile.skinTone}`}>
+                        <span className="w-3.5 h-3.5 rounded-full border border-white/20" style={{ backgroundColor: humanProfile.skinTone }} />
+                        <span className="text-[10px] text-neutral-400">Skin</span>
+                      </div>
+                      <div className="flex items-center gap-1" title={`Hair Tone: ${humanProfile.hairColor}`}>
+                        <span className="w-3.5 h-3.5 rounded-full border border-white/20" style={{ backgroundColor: humanProfile.hairColor }} />
+                        <span className="text-[10px] text-neutral-400">Hair</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Generation Progress Bar */}
               {isGenerating3D && (

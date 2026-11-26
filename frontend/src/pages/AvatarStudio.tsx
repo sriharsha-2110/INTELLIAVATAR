@@ -203,7 +203,10 @@ export default function AvatarStudio() {
                 cameraPreset={cameraPreset}
                 lightingTheme={lightingTheme}
                 wireframe={wireframe}
-                gender={avatar.gender_presentation || 'female'}
+                gender={avatar.settings_json?.detected_gender || avatar.gender_presentation || 'Female'}
+                skinTone={avatar.settings_json?.skin_tone}
+                hairColor={avatar.settings_json?.hair_color}
+                clothingColor={avatar.settings_json?.clothing_color}
                 enableControls={true}
                 onCameraChange={(p) => setCameraPreset(p)}
               />

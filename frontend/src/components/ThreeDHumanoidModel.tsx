@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame, useLoader } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -20,7 +20,10 @@ interface ThreeDHumanoidModelProps {
   gesture?: TeachingGesture;
   emotion?: string;
   wireframe?: boolean;
-  gender?: string;
+  gender?: string; // 'Female' | 'Male' | other
+  skinTone?: string;
+  hairColor?: string;
+  clothingColor?: string;
 }
 
 export default function ThreeDHumanoidModel({
@@ -29,7 +32,10 @@ export default function ThreeDHumanoidModel({
   gesture = 'idle',
   emotion = 'NEUTRAL',
   wireframe = false,
-  gender = 'female',
+  gender = 'Female',
+  skinTone,
+  hairColor,
+  clothingColor,
 }: ThreeDHumanoidModelProps) {
   // References to skeletal joints
   const rootRef = useRef<THREE.Group>(null);
@@ -41,10 +47,15 @@ export default function ThreeDHumanoidModel({
   const leftForearmRef = useRef<THREE.Group>(null);
   const rightArmRef = useRef<THREE.Group>(null);
   const rightForearmRef = useRef<THREE.Group>(null);
-  const jawRef = useRef<THREE.Mesh>(null);
-  const mouthRef = useRef<THREE.Mesh>(null);
-  const leftEyeRef = useRef<THREE.Mesh>(null);
-  const rightEyeRef = useRef<THREE.Mesh>(null);
+  
+  // Facial rig references for lip-sync & blinking
+  const jawRef = useRef<THREE.Group>(null);
+  const upperLipRef = useRef<THREE.Mesh>(null);
+  const lowerLipRef = useRef<THREE.Mesh>(null);
+  const mouthHoleRef = useRef<THREE.Mesh>(null);
+  const teethRef = useRef<THREE.Mesh>(null);
+  const leftEyelidRef = useRef<THREE.Mesh>(null);
+  const rightEyelidRef = useRef<THREE.Mesh>(null);
 
   // Load portrait texture for face material projection
   const faceTexture = useLoader(
@@ -52,20 +63,38 @@ export default function ThreeDHumanoidModel({
     portraitTextureUrl || '/avatars/aurora_hologram.jpg'
   );
   faceTexture.colorSpace = THREE.SRGBColorSpace;
+  faceTexture.wrapS = THREE.ClampToEdgeWrapping;
+  faceTexture.wrapT = THREE.ClampToEdgeWrapping;
 
-  // Shader / Material properties
-  const isFemale = (gender || '').toLowerCase().includes('female');
-  const skinColor = isFemale ? '#e0b8a3' : '#d2a68a';
-  const clothingColor = isFemale ? '#1e293b' : '#0f172a';
-  const accentColor = '#06b6d4'; // Cyber cyan
+  // Normalized Gender & Style settings
+  const isFemale = (gender || 'Female').toLowerCase().includes('female');
+  const baseSkinColor = skinTone || (isFemale ? '#e0b8a3' : '#d2a68a');
+  const baseHairColor = hairColor || (isFemale ? '#221510' : '#1a1816');
+  const baseClothingColor = clothingColor || (isFemale ? '#1e293b' : '#0f172a');
+  const accentColor = '#06b6d4'; // Digital human cyan accent
 
-  // Lip-sync viseme timer
+  // Create curved 3D face mesh geometry so the portrait wraps around the front of the head
+  const faceCurvedGeometry = useMemo(() => {
+    // Hemisphere curved mask for front of the face
+    const geom = new THREE.SphereGeometry(
+      0.218, // radius
+      32,    // width segments
+      32,    // height segments
+      -Math.PI / 3.2, // phiStart (curved across the front)
+      (2 * Math.PI) / 3.2, // phiLength
+      Math.PI / 5.5, // thetaStart
+      (Math.PI / 2.1) // thetaLength
+    );
+    return geom;
+  }, []);
+
+  // Lip-sync viseme animation state
   const visemeState = useRef({
     mouthOpen: 0,
     mouthWidth: 1,
-    jawRotation: 0,
+    jawDrop: 0,
     blinkFactor: 0,
-    nextBlinkTime: 2.5,
+    nextBlinkTime: 2.2,
   });
 
   // Animation frame loop with smooth slerp/lerp blending
@@ -75,7 +104,7 @@ export default function ThreeDHumanoidModel({
     // 1. Natural Eye Blinking cycle
     if (time > visemeState.current.nextBlinkTime) {
       visemeState.current.blinkFactor = 1;
-      visemeState.current.nextBlinkTime = time + 3.0 + Math.random() * 2.5;
+      visemeState.current.nextBlinkTime = time + 3.2 + Math.random() * 2.2;
     } else {
       visemeState.current.blinkFactor = THREE.MathUtils.lerp(
         visemeState.current.blinkFactor, 
@@ -84,54 +113,66 @@ export default function ThreeDHumanoidModel({
       );
     }
 
-    if (leftEyeRef.current && rightEyeRef.current) {
-      const eyeScaleY = Math.max(0.08, 1 - visemeState.current.blinkFactor);
-      leftEyeRef.current.scale.y = eyeScaleY;
-      rightEyeRef.current.scale.y = eyeScaleY;
+    if (leftEyelidRef.current && rightEyelidRef.current) {
+      const lidY = -0.015 + visemeState.current.blinkFactor * 0.025;
+      leftEyelidRef.current.position.y = lidY;
+      rightEyelidRef.current.position.y = lidY;
     }
 
-    // 2. Lip-Sync Phoneme Extraction & Mouth blendshapes
+    // 2. Realistic 3D Viseme Lip-Syncing
     if (isSpeaking) {
-      const speechCadence = Math.sin(time * 18) * 0.5 + 0.5;
-      const phonemeJitter = Math.cos(time * 26) * 0.3;
-      const targetMouthOpen = Math.max(0.1, speechCadence + phonemeJitter * 0.5);
-      const targetMouthWidth = 1 + Math.sin(time * 12) * 0.25;
+      // Fast, dynamic viseme cadence replicating real speech phonemes (Ah, Oh, Ee, M)
+      const primaryPulse = Math.sin(time * 16) * 0.5 + 0.5;
+      const secondaryPulse = Math.cos(time * 24) * 0.3;
+      const targetMouthOpen = Math.max(0.12, primaryPulse + secondaryPulse * 0.4);
+      const targetMouthWidth = 1.0 + Math.sin(time * 10) * 0.22;
 
       visemeState.current.mouthOpen = THREE.MathUtils.lerp(
         visemeState.current.mouthOpen,
         targetMouthOpen,
-        delta * 22
+        delta * 24
       );
       visemeState.current.mouthWidth = THREE.MathUtils.lerp(
         visemeState.current.mouthWidth,
         targetMouthWidth,
-        delta * 18
+        delta * 20
       );
-      visemeState.current.jawRotation = visemeState.current.mouthOpen * 0.22;
+      visemeState.current.jawDrop = visemeState.current.mouthOpen * 0.038;
     } else {
       visemeState.current.mouthOpen = THREE.MathUtils.lerp(
         visemeState.current.mouthOpen,
         0,
-        delta * 15
+        delta * 16
       );
       visemeState.current.mouthWidth = THREE.MathUtils.lerp(
         visemeState.current.mouthWidth,
         1,
-        delta * 15
+        delta * 16
       );
-      visemeState.current.jawRotation = THREE.MathUtils.lerp(
-        visemeState.current.jawRotation,
+      visemeState.current.jawDrop = THREE.MathUtils.lerp(
+        visemeState.current.jawDrop,
         0,
-        delta * 15
+        delta * 16
       );
     }
 
-    if (mouthRef.current) {
-      mouthRef.current.scale.y = Math.max(0.1, visemeState.current.mouthOpen * 2.0);
-      mouthRef.current.scale.x = visemeState.current.mouthWidth;
-    }
+    // Apply lip and jaw displacement
     if (jawRef.current) {
-      jawRef.current.rotation.x = visemeState.current.jawRotation;
+      jawRef.current.position.y = -visemeState.current.jawDrop;
+    }
+    if (lowerLipRef.current) {
+      lowerLipRef.current.position.y = -0.076 - visemeState.current.jawDrop * 0.7;
+      lowerLipRef.current.scale.x = visemeState.current.mouthWidth;
+    }
+    if (upperLipRef.current) {
+      upperLipRef.current.scale.x = visemeState.current.mouthWidth;
+    }
+    if (mouthHoleRef.current) {
+      mouthHoleRef.current.scale.y = Math.max(0.1, visemeState.current.mouthOpen * 2.2);
+      mouthHoleRef.current.scale.x = visemeState.current.mouthWidth;
+    }
+    if (teethRef.current) {
+      teethRef.current.visible = visemeState.current.mouthOpen > 0.25;
     }
 
     // 3. Subtle breathing & spine sway
@@ -140,7 +181,7 @@ export default function ThreeDHumanoidModel({
       chestRef.current.position.y = 1.05 + breathing;
     }
 
-    // 4. Kinematic Teaching Gestures Animation Matrix
+    // 4. Teaching Kinematic Gestures
     let targetHeadRot = { x: 0, y: 0, z: 0 };
     let targetLeftArmRot = { x: 0.1, y: 0, z: 0.2 };
     let targetLeftForearmRot = { x: 0.3, y: 0, z: 0 };
@@ -151,23 +192,22 @@ export default function ThreeDHumanoidModel({
       case 'speaking':
         targetHeadRot = {
           x: Math.sin(time * 3) * 0.04,
-          y: Math.cos(time * 2) * 0.06,
+          y: Math.cos(time * 2) * 0.05,
           z: Math.sin(time * 1.5) * 0.02,
         };
         targetRightArmRot = {
-          x: 0.3 + Math.sin(time * 2.5) * 0.1,
+          x: 0.35 + Math.sin(time * 2.5) * 0.1,
           y: 0.1,
           z: -0.35,
         };
         targetRightForearmRot = {
-          x: 0.8 + Math.cos(time * 2.5) * 0.15,
+          x: 0.85 + Math.cos(time * 2.5) * 0.15,
           y: 0.2,
           z: 0,
         };
         break;
 
       case 'explain_one_hand':
-        // Explaining actively with right arm raised & gesturing
         targetHeadRot = { x: 0.05, y: -0.1, z: 0 };
         targetRightArmRot = {
           x: 0.5 + Math.sin(time * 3) * 0.08,
@@ -182,7 +222,6 @@ export default function ThreeDHumanoidModel({
         break;
 
       case 'explain_two_hands':
-        // Both hands elevated open to class
         targetHeadRot = { x: -0.05, y: 0, z: 0 };
         targetLeftArmRot = {
           x: 0.45 + Math.sin(time * 2) * 0.06,
@@ -207,7 +246,6 @@ export default function ThreeDHumanoidModel({
         break;
 
       case 'point_left':
-        // Turn body slightly and point left arm directly at the digital whiteboard
         targetHeadRot = { x: 0.02, y: 0.45, z: 0 };
         targetLeftArmRot = { x: 0.85, y: 0.4, z: 0.7 };
         targetLeftForearmRot = { x: 0.4, y: 0.1, z: 0.1 };
@@ -221,14 +259,12 @@ export default function ThreeDHumanoidModel({
         break;
 
       case 'thinking':
-        // Right hand at chin, head tilted up
         targetHeadRot = { x: -0.18, y: 0.15, z: 0.08 };
         targetRightArmRot = { x: 0.95, y: -0.3, z: -0.4 };
         targetRightForearmRot = { x: 1.6, y: 0.5, z: 0.2 };
         break;
 
       case 'nodding':
-        // Head nodding in agreement
         targetHeadRot = {
           x: Math.sin(time * 5.5) * 0.18,
           y: 0,
@@ -237,7 +273,6 @@ export default function ThreeDHumanoidModel({
         break;
 
       case 'greeting':
-        // Welcoming hand wave
         targetHeadRot = { x: 0.05, y: 0, z: 0 };
         targetRightArmRot = { x: 1.2, y: 0.1, z: -0.6 };
         targetRightForearmRot = {
@@ -248,7 +283,6 @@ export default function ThreeDHumanoidModel({
         break;
 
       case 'celebrating':
-        // Both arms raised high in thumbs-up / celebration
         targetHeadRot = { x: -0.15, y: 0, z: 0 };
         targetLeftArmRot = { x: 1.4, y: -0.2, z: 0.8 };
         targetLeftForearmRot = { x: 0.6, y: 0, z: 0 };
@@ -268,33 +302,28 @@ export default function ThreeDHumanoidModel({
         break;
     }
 
-    // Smooth blending interpolation using lerp
-    const lerpSpeed = delta * 6.5;
+    const lerpSpeed = delta * 7.0;
 
     if (headRef.current) {
       headRef.current.rotation.x = THREE.MathUtils.lerp(headRef.current.rotation.x, targetHeadRot.x, lerpSpeed);
       headRef.current.rotation.y = THREE.MathUtils.lerp(headRef.current.rotation.y, targetHeadRot.y, lerpSpeed);
       headRef.current.rotation.z = THREE.MathUtils.lerp(headRef.current.rotation.z, targetHeadRot.z, lerpSpeed);
     }
-
     if (leftArmRef.current) {
       leftArmRef.current.rotation.x = THREE.MathUtils.lerp(leftArmRef.current.rotation.x, targetLeftArmRot.x, lerpSpeed);
       leftArmRef.current.rotation.y = THREE.MathUtils.lerp(leftArmRef.current.rotation.y, targetLeftArmRot.y, lerpSpeed);
       leftArmRef.current.rotation.z = THREE.MathUtils.lerp(leftArmRef.current.rotation.z, targetLeftArmRot.z, lerpSpeed);
     }
-
     if (leftForearmRef.current) {
       leftForearmRef.current.rotation.x = THREE.MathUtils.lerp(leftForearmRef.current.rotation.x, targetLeftForearmRot.x, lerpSpeed);
       leftForearmRef.current.rotation.y = THREE.MathUtils.lerp(leftForearmRef.current.rotation.y, targetLeftForearmRot.y, lerpSpeed);
       leftForearmRef.current.rotation.z = THREE.MathUtils.lerp(leftForearmRef.current.rotation.z, targetLeftForearmRot.z, lerpSpeed);
     }
-
     if (rightArmRef.current) {
       rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, targetRightArmRot.x, lerpSpeed);
       rightArmRef.current.rotation.y = THREE.MathUtils.lerp(rightArmRef.current.rotation.y, targetRightArmRot.y, lerpSpeed);
       rightArmRef.current.rotation.z = THREE.MathUtils.lerp(rightArmRef.current.rotation.z, targetRightArmRot.z, lerpSpeed);
     }
-
     if (rightForearmRef.current) {
       rightForearmRef.current.rotation.x = THREE.MathUtils.lerp(rightForearmRef.current.rotation.x, targetRightForearmRot.x, lerpSpeed);
       rightForearmRef.current.rotation.y = THREE.MathUtils.lerp(rightForearmRef.current.rotation.y, targetRightForearmRot.y, lerpSpeed);
@@ -307,165 +336,261 @@ export default function ThreeDHumanoidModel({
       
       {/* 1. PELVIS & HIPS */}
       <mesh position={[0, 0.75, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.22, 0.24, 0.28, 16]} />
-        <meshStandardMaterial color={clothingColor} roughness={0.7} wireframe={wireframe} />
+        <cylinderGeometry args={[isFemale ? 0.21 : 0.24, isFemale ? 0.25 : 0.24, 0.28, 20]} />
+        <meshStandardMaterial color={baseClothingColor} roughness={0.7} wireframe={wireframe} />
       </mesh>
 
       {/* LEGS */}
-      <mesh position={[-0.14, 0.35, 0]} castShadow>
-        <cylinderGeometry args={[0.09, 0.08, 0.65, 12]} />
-        <meshStandardMaterial color={clothingColor} roughness={0.8} wireframe={wireframe} />
+      <mesh position={[-0.13, 0.35, 0]} castShadow>
+        <cylinderGeometry args={[0.085, 0.075, 0.65, 16]} />
+        <meshStandardMaterial color={baseClothingColor} roughness={0.8} wireframe={wireframe} />
       </mesh>
-      <mesh position={[0.14, 0.35, 0]} castShadow>
-        <cylinderGeometry args={[0.09, 0.08, 0.65, 12]} />
-        <meshStandardMaterial color={clothingColor} roughness={0.8} wireframe={wireframe} />
+      <mesh position={[0.13, 0.35, 0]} castShadow>
+        <cylinderGeometry args={[0.085, 0.075, 0.65, 16]} />
+        <meshStandardMaterial color={baseClothingColor} roughness={0.8} wireframe={wireframe} />
       </mesh>
 
       {/* FEET / SHOES */}
-      <mesh position={[-0.14, 0.02, 0.05]} castShadow>
-        <boxGeometry args={[0.11, 0.06, 0.22]} />
-        <meshStandardMaterial color="#0a0a0c" roughness={0.4} />
+      <mesh position={[-0.13, 0.02, 0.05]} castShadow>
+        <boxGeometry args={[0.105, 0.055, 0.21]} />
+        <meshStandardMaterial color="#0c0d12" roughness={0.3} />
       </mesh>
-      <mesh position={[0.14, 0.02, 0.05]} castShadow>
-        <boxGeometry args={[0.11, 0.06, 0.22]} />
-        <meshStandardMaterial color="#0a0a0c" roughness={0.4} />
+      <mesh position={[0.13, 0.02, 0.05]} castShadow>
+        <boxGeometry args={[0.105, 0.055, 0.21]} />
+        <meshStandardMaterial color="#0c0d12" roughness={0.3} />
       </mesh>
 
-      {/* 2. SPINE & CHEST */}
+      {/* 2. SPINE & TORSO */}
       <group ref={spineRef} position={[0, 0.88, 0]}>
         <mesh position={[0, 0.12, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.25, 0.22, 0.28, 16]} />
-          <meshStandardMaterial color={clothingColor} roughness={0.6} wireframe={wireframe} />
+          <cylinderGeometry args={[isFemale ? 0.22 : 0.26, isFemale ? 0.21 : 0.24, 0.28, 20]} />
+          <meshStandardMaterial color={baseClothingColor} roughness={0.6} wireframe={wireframe} />
         </mesh>
 
+        {/* CHEST / TEACHER BLAZER */}
         <group ref={chestRef} position={[0, 0.26, 0]}>
           <mesh castShadow receiveShadow>
-            <cylinderGeometry args={[0.3, 0.26, 0.34, 16]} />
-            <meshStandardMaterial color={clothingColor} roughness={0.5} wireframe={wireframe} />
+            <cylinderGeometry args={[isFemale ? 0.27 : 0.33, isFemale ? 0.23 : 0.27, 0.35, 20]} />
+            <meshStandardMaterial color={baseClothingColor} roughness={0.5} wireframe={wireframe} />
           </mesh>
 
-          {/* Teacher Badge / Neural Accent Line */}
-          <mesh position={[0.12, 0.08, 0.26]}>
-            <boxGeometry args={[0.08, 0.05, 0.01]} />
+          {/* Teacher Shirt / Inner Blouse Collar */}
+          <mesh position={[0, 0.12, 0.12]} rotation={[0.2, 0, 0]}>
+            <planeGeometry args={[0.14, 0.14]} />
+            <meshStandardMaterial color="#f8fafc" roughness={0.4} />
+          </mesh>
+
+          {/* Teacher Digital Badge */}
+          <mesh position={[0.12, 0.09, 0.22]}>
+            <boxGeometry args={[0.065, 0.045, 0.01]} />
             <meshStandardMaterial color={accentColor} emissive={accentColor} emissiveIntensity={0.6} />
           </mesh>
 
           {/* 3. SHOULDERS & ARMS */}
-          {/* LEFT SHOULDER & ARM */}
-          <group ref={leftArmRef} position={[-0.34, 0.12, 0]}>
+          {/* LEFT ARM */}
+          <group ref={leftArmRef} position={[isFemale ? -0.31 : -0.36, 0.12, 0]}>
             <mesh castShadow>
-              <sphereGeometry args={[0.09, 12, 12]} />
-              <meshStandardMaterial color={clothingColor} />
+              <sphereGeometry args={[0.08, 16, 16]} />
+              <meshStandardMaterial color={baseClothingColor} />
             </mesh>
-            <mesh position={[-0.04, -0.22, 0]} castShadow>
-              <cylinderGeometry args={[0.07, 0.06, 0.38, 12]} />
-              <meshStandardMaterial color={clothingColor} roughness={0.6} wireframe={wireframe} />
+            <mesh position={[-0.04, -0.21, 0]} castShadow>
+              <cylinderGeometry args={[0.065, 0.055, 0.36, 16]} />
+              <meshStandardMaterial color={baseClothingColor} roughness={0.6} wireframe={wireframe} />
             </mesh>
 
             {/* Left Forearm & Hand */}
-            <group ref={leftForearmRef} position={[-0.05, -0.42, 0]}>
-              <mesh position={[0, -0.18, 0]} castShadow>
-                <cylinderGeometry args={[0.06, 0.05, 0.32, 12]} />
-                <meshStandardMaterial color={skinColor} roughness={0.7} wireframe={wireframe} />
+            <group ref={leftForearmRef} position={[-0.05, -0.4, 0]}>
+              <mesh position={[0, -0.17, 0]} castShadow>
+                <cylinderGeometry args={[0.055, 0.048, 0.3, 16]} />
+                <meshStandardMaterial color={baseSkinColor} roughness={0.65} wireframe={wireframe} />
               </mesh>
               {/* Hand */}
-              <mesh position={[0, -0.34, 0]} castShadow>
-                <boxGeometry args={[0.06, 0.1, 0.03]} />
-                <meshStandardMaterial color={skinColor} roughness={0.7} />
+              <mesh position={[0, -0.32, 0]} castShadow>
+                <boxGeometry args={[0.055, 0.09, 0.028]} />
+                <meshStandardMaterial color={baseSkinColor} roughness={0.65} />
               </mesh>
             </group>
           </group>
 
-          {/* RIGHT SHOULDER & ARM */}
-          <group ref={rightArmRef} position={[0.34, 0.12, 0]}>
+          {/* RIGHT ARM */}
+          <group ref={rightArmRef} position={[isFemale ? 0.31 : 0.36, 0.12, 0]}>
             <mesh castShadow>
-              <sphereGeometry args={[0.09, 12, 12]} />
-              <meshStandardMaterial color={clothingColor} />
+              <sphereGeometry args={[0.08, 16, 16]} />
+              <meshStandardMaterial color={baseClothingColor} />
             </mesh>
-            <mesh position={[0.04, -0.22, 0]} castShadow>
-              <cylinderGeometry args={[0.07, 0.06, 0.38, 12]} />
-              <meshStandardMaterial color={clothingColor} roughness={0.6} wireframe={wireframe} />
+            <mesh position={[0.04, -0.21, 0]} castShadow>
+              <cylinderGeometry args={[0.065, 0.055, 0.36, 16]} />
+              <meshStandardMaterial color={baseClothingColor} roughness={0.6} wireframe={wireframe} />
             </mesh>
 
             {/* Right Forearm & Hand */}
-            <group ref={rightForearmRef} position={[0.05, -0.42, 0]}>
-              <mesh position={[0, -0.18, 0]} castShadow>
-                <cylinderGeometry args={[0.06, 0.05, 0.32, 12]} />
-                <meshStandardMaterial color={skinColor} roughness={0.7} wireframe={wireframe} />
+            <group ref={rightForearmRef} position={[0.05, -0.4, 0]}>
+              <mesh position={[0, -0.17, 0]} castShadow>
+                <cylinderGeometry args={[0.055, 0.048, 0.3, 16]} />
+                <meshStandardMaterial color={baseSkinColor} roughness={0.65} wireframe={wireframe} />
               </mesh>
               {/* Hand */}
-              <mesh position={[0, -0.34, 0]} castShadow>
-                <boxGeometry args={[0.06, 0.1, 0.03]} />
-                <meshStandardMaterial color={skinColor} roughness={0.7} />
+              <mesh position={[0, -0.32, 0]} castShadow>
+                <boxGeometry args={[0.055, 0.09, 0.028]} />
+                <meshStandardMaterial color={baseSkinColor} roughness={0.65} />
               </mesh>
             </group>
           </group>
 
           {/* 4. NECK */}
-          <group ref={neckRef} position={[0, 0.22, 0]}>
+          <group ref={neckRef} position={[0, 0.23, 0]}>
             <mesh castShadow>
-              <cylinderGeometry args={[0.1, 0.11, 0.16, 16]} />
-              <meshStandardMaterial color={skinColor} roughness={0.7} wireframe={wireframe} />
+              <cylinderGeometry args={[isFemale ? 0.09 : 0.105, isFemale ? 0.1 : 0.115, 0.15, 20]} />
+              <meshStandardMaterial color={baseSkinColor} roughness={0.65} wireframe={wireframe} />
             </mesh>
 
-            {/* 5. HEAD & FACIAL BLENDSHAPES */}
+            {/* 5. ANATOMICAL 3D HEAD OF THE IMAGED PERSON */}
             <group ref={headRef} position={[0, 0.22, 0]}>
               
-              {/* Head Cranium */}
+              {/* Head Cranium & Scalp (Matches exact person skin tone) */}
               <mesh castShadow receiveShadow>
-                <sphereGeometry args={[0.22, 24, 24]} />
-                <meshStandardMaterial color={skinColor} roughness={0.65} wireframe={wireframe} />
-              </mesh>
-
-              {/* Hair Geometry */}
-              <mesh position={[0, 0.06, -0.04]}>
-                <sphereGeometry args={[0.23, 20, 20]} />
-                <meshStandardMaterial color="#1a1412" roughness={0.8} />
-              </mesh>
-
-              {/* Front Face Projection Plane with Portrait Texture */}
-              <mesh position={[0, 0.01, 0.185]} rotation={[0, 0, 0]}>
-                <planeGeometry args={[0.28, 0.28]} />
-                <meshStandardMaterial
-                  map={faceTexture}
-                  roughness={0.5}
-                  metalness={0.05}
-                  transparent
-                  opacity={0.92}
+                <sphereGeometry args={[0.215, 32, 32]} />
+                <meshStandardMaterial 
+                  color={baseSkinColor} 
+                  roughness={0.6} 
+                  wireframe={wireframe} 
                 />
               </mesh>
 
-              {/* Eyes with Blinking Morph Target */}
-              <group position={[0, 0.04, 0.20]}>
-                <mesh ref={leftEyeRef} position={[-0.065, 0, 0]}>
-                  <sphereGeometry args={[0.024, 12, 12]} />
-                  <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={0.3} />
+              {/* Ears */}
+              <mesh position={[-0.205, -0.01, -0.02]} rotation={[0, -0.2, 0]}>
+                <boxGeometry args={[0.025, 0.07, 0.045]} />
+                <meshStandardMaterial color={baseSkinColor} roughness={0.65} />
+              </mesh>
+              <mesh position={[0.205, -0.01, -0.02]} rotation={[0, 0.2, 0]}>
+                <boxGeometry args={[0.025, 0.07, 0.045]} />
+                <meshStandardMaterial color={baseSkinColor} roughness={0.65} />
+              </mesh>
+
+              {/* CURVED 3D FACE MASK WITH PERSON'S ACTUAL PHOTO TEXTURE */}
+              {/* This seamlessly projects the uploaded face photo onto the 3D curved front of the head */}
+              <mesh 
+                geometry={faceCurvedGeometry}
+                position={[0, 0.005, 0.006]}
+                castShadow
+              >
+                <meshStandardMaterial
+                  map={faceTexture}
+                  roughness={0.52}
+                  metalness={0.04}
+                  transparent={false}
+                />
+              </mesh>
+
+              {/* 3D Nose Bridge Contour for Realistic Depth */}
+              <mesh position={[0, 0.005, 0.212]} rotation={[0.1, 0, 0]}>
+                <cylinderGeometry args={[0.018, 0.028, 0.075, 12]} />
+                <meshStandardMaterial 
+                  color={baseSkinColor} 
+                  roughness={0.55} 
+                  transparent
+                  opacity={0.35} 
+                />
+              </mesh>
+
+              {/* EYE BLINKING LIDS */}
+              <group position={[0, 0.045, 0.208]}>
+                <mesh ref={leftEyelidRef} position={[-0.062, 0, 0]}>
+                  <planeGeometry args={[0.038, 0.018]} />
+                  <meshStandardMaterial color={baseSkinColor} roughness={0.6} />
                 </mesh>
-                <mesh ref={rightEyeRef} position={[0.065, 0, 0]}>
-                  <sphereGeometry args={[0.024, 12, 12]} />
-                  <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={0.3} />
+                <mesh ref={rightEyelidRef} position={[0.062, 0, 0]}>
+                  <planeGeometry args={[0.038, 0.018]} />
+                  <meshStandardMaterial color={baseSkinColor} roughness={0.6} />
                 </mesh>
               </group>
 
-              {/* Articulated Jaw with Morph Target Rotation */}
-              <mesh ref={jawRef} position={[0, -0.09, 0.17]}>
-                <boxGeometry args={[0.11, 0.035, 0.04]} />
-                <meshStandardMaterial color={skinColor} roughness={0.7} />
+              {/* ARTICULATED 3D JAW & LIP-SYNC RIG */}
+              <group ref={jawRef}>
+                {/* Chin Contour */}
+                <mesh position={[0, -0.155, 0.14]}>
+                  <sphereGeometry args={[isFemale ? 0.068 : 0.082, 16, 16]} />
+                  <meshStandardMaterial color={baseSkinColor} roughness={0.65} />
+                </mesh>
+              </group>
+
+              {/* 3D Upper Lip */}
+              <mesh ref={upperLipRef} position={[0, -0.052, 0.204]}>
+                <boxGeometry args={[0.058, 0.014, 0.018]} />
+                <meshStandardMaterial color={baseSkinColor} roughness={0.65} />
               </mesh>
 
-              {/* Lip-Sync Viseme Aperture */}
-              <mesh ref={mouthRef} position={[0, -0.068, 0.205]}>
-                <sphereGeometry args={[0.032, 16, 16]} />
+              {/* 3D Lower Lip (moves with speech) */}
+              <mesh ref={lowerLipRef} position={[0, -0.076, 0.20]}>
+                <boxGeometry args={[0.054, 0.016, 0.018]} />
+                <meshStandardMaterial color={baseSkinColor} roughness={0.65} />
+              </mesh>
+
+              {/* Dynamic Inner Oral Cavity */}
+              <mesh ref={mouthHoleRef} position={[0, -0.064, 0.198]}>
+                <boxGeometry args={[0.048, 0.018, 0.02]} />
+                <meshStandardMaterial color="#120606" roughness={0.9} />
+              </mesh>
+
+              {/* Visible Teeth during speech */}
+              <mesh ref={teethRef} position={[0, -0.06, 0.202]} visible={false}>
+                <boxGeometry args={[0.038, 0.008, 0.005]} />
+                <meshStandardMaterial color="#f1f5f9" roughness={0.3} />
+              </mesh>
+
+              {/* 3D HAIR GEOMETRY (Styled for Gender & Sampled Color) */}
+              {isFemale ? (
+                /* Female Styled Hair with Volume and Flow */
+                <group position={[0, 0.06, 0]}>
+                  {/* Top Hair Cap */}
+                  <mesh position={[0, 0.04, -0.02]}>
+                    <sphereGeometry args={[0.228, 24, 24]} />
+                    <meshStandardMaterial color={baseHairColor} roughness={0.75} />
+                  </mesh>
+                  {/* Side Curls framing face */}
+                  <mesh position={[-0.17, -0.1, 0.04]}>
+                    <cylinderGeometry args={[0.055, 0.045, 0.28, 12]} />
+                    <meshStandardMaterial color={baseHairColor} roughness={0.75} />
+                  </mesh>
+                  <mesh position={[0.17, -0.1, 0.04]}>
+                    <cylinderGeometry args={[0.055, 0.045, 0.28, 12]} />
+                    <meshStandardMaterial color={baseHairColor} roughness={0.75} />
+                  </mesh>
+                  {/* Back Hair Volume */}
+                  <mesh position={[0, -0.12, -0.12]}>
+                    <cylinderGeometry args={[0.14, 0.18, 0.32, 16]} />
+                    <meshStandardMaterial color={baseHairColor} roughness={0.8} />
+                  </mesh>
+                </group>
+              ) : (
+                /* Male Styled Short / Parted Professional Haircut */
+                <group position={[0, 0.07, 0]}>
+                  <mesh position={[0, 0.035, -0.015]}>
+                    <sphereGeometry args={[0.224, 24, 24]} />
+                    <meshStandardMaterial color={baseHairColor} roughness={0.75} />
+                  </mesh>
+                  {/* Neat Male Sideburns */}
+                  <mesh position={[-0.19, -0.06, 0.02]}>
+                    <boxGeometry args={[0.02, 0.09, 0.04]} />
+                    <meshStandardMaterial color={baseHairColor} roughness={0.75} />
+                  </mesh>
+                  <mesh position={[0.19, -0.06, 0.02]}>
+                    <boxGeometry args={[0.02, 0.09, 0.04]} />
+                    <meshStandardMaterial color={baseHairColor} roughness={0.75} />
+                  </mesh>
+                </group>
+              )}
+
+              {/* Digital Human Neural Aura Halo */}
+              <mesh position={[0, 0.34, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[0.24, 0.007, 16, 32]} />
                 <meshStandardMaterial 
-                  color="#1a0a0a" 
-                  roughness={0.9} 
+                  color={accentColor} 
+                  emissive={accentColor} 
+                  emissiveIntensity={0.7} 
+                  transparent 
+                  opacity={0.8} 
                 />
-              </mesh>
-
-              {/* Holographic Neural Aura Halo for 3D AI Digital Human */}
-              <mesh position={[0, 0.32, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[0.24, 0.008, 16, 32]} />
-                <meshStandardMaterial color={accentColor} emissive={accentColor} emissiveIntensity={0.8} />
               </mesh>
 
             </group>
@@ -474,10 +599,16 @@ export default function ThreeDHumanoidModel({
         </group>
       </group>
 
-      {/* Pedestal Base / Holographic Floor Ring */}
+      {/* Holographic Floor Emitter */}
       <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <ringGeometry args={[0.6, 0.75, 32]} />
-        <meshStandardMaterial color={accentColor} emissive={accentColor} emissiveIntensity={0.5} transparent opacity={0.6} />
+        <ringGeometry args={[0.6, 0.72, 32]} />
+        <meshStandardMaterial 
+          color={accentColor} 
+          emissive={accentColor} 
+          emissiveIntensity={0.5} 
+          transparent 
+          opacity={0.5} 
+        />
       </mesh>
     </group>
   );

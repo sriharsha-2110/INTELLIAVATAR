@@ -22,3 +22,8 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Dynamic Uploads (keep default aurora_hologram)
+backend/uploads/avatars/*
+!backend/uploads/avatars/aurora_hologram.jpg
+backend/uploads/models/*
